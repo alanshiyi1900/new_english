@@ -411,14 +411,14 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="h-screen w-full bg-slate-50 flex flex-col overflow-hidden max-w-md mx-auto shadow-2xl md:my-8 md:rounded-[3rem] md:h-[800px] md:border-8 md:border-slate-800 relative">
+    <div className="h-[100dvh] w-full bg-slate-50 flex flex-col overflow-hidden max-w-md mx-auto shadow-2xl md:my-8 md:rounded-[3rem] md:h-[800px] md:border-8 md:border-slate-800 relative">
       
       <main className="flex-1 overflow-y-auto scrollbar-hide bg-slate-50">
         
         {/* --- PRACTICE TAB --- */}
         {activeTab === 'practice' && (
           <div className="p-5 pb-24 relative min-h-full">
-            <header className="flex justify-between items-center mb-6 mt-2">
+            <header className="flex justify-between items-center mb-6 mt-2 pt-safe">
               <div>
                 <h1 className="text-2xl font-bold text-slate-800 tracking-tight">FluentAI</h1>
                 <p className="text-slate-500 text-sm">Welcome back, {userProfile.name.split(' ')[0]}!</p>
@@ -465,7 +465,7 @@ const App: React.FC = () => {
                )}
             </div>
 
-            <div className="fixed bottom-24 right-5 md:absolute md:bottom-24 md:right-5 z-40">
+            <div className="fixed bottom-24 right-5 md:absolute md:bottom-24 md:right-5 z-40 pb-safe">
                <button 
                  onClick={() => setIsCustomModalOpen(true)}
                  className="bg-indigo-600 text-white p-4 rounded-2xl shadow-lg shadow-indigo-300 hover:bg-indigo-700 hover:scale-105 transition-all flex items-center gap-2"
@@ -480,7 +480,7 @@ const App: React.FC = () => {
         {/* --- HISTORY TAB --- */}
         {activeTab === 'history' && (
           <div className="p-5 pb-24 h-full flex flex-col">
-             <header className="mb-6 mt-2 sticky top-0 bg-slate-50 z-10 pb-2">
+             <header className="mb-6 mt-2 sticky top-0 bg-slate-50 z-10 pb-2 pt-safe">
                 <h1 className="text-2xl font-bold text-slate-800">History</h1>
                 <p className="text-slate-500 text-sm">Your past conversations</p>
              </header>
@@ -560,7 +560,7 @@ const App: React.FC = () => {
         {/* --- PROFILE TAB --- */}
         {activeTab === 'profile' && profileView === 'main' && (
           <div className="p-5 pb-24">
-             <header className="mb-8 mt-2 flex justify-between items-center">
+             <header className="mb-8 mt-2 flex justify-between items-center pt-safe">
                 <div>
                   <h1 className="text-2xl font-bold text-slate-800">My Profile</h1>
                 </div>
@@ -685,7 +685,7 @@ const App: React.FC = () => {
         {/* --- ACHIEVEMENTS SUB-VIEW --- */}
         {activeTab === 'profile' && profileView === 'achievements' && (
           <div className="p-5 pb-24 h-full flex flex-col">
-            <header className="mb-6 mt-2 flex items-center gap-3">
+            <header className="mb-6 mt-2 flex items-center gap-3 pt-safe">
               <button onClick={() => setProfileView('main')} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
                 <ChevronRight size={20} className="rotate-180 text-slate-600" />
               </button>
@@ -718,7 +718,7 @@ const App: React.FC = () => {
         {/* --- SETTINGS SUB-VIEW --- */}
         {activeTab === 'profile' && profileView === 'settings' && (
           <div className="p-5 pb-24 h-full flex flex-col">
-            <header className="mb-6 mt-2 flex items-center gap-3">
+            <header className="mb-6 mt-2 flex items-center gap-3 pt-safe">
               <button onClick={() => setProfileView('main')} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
                 <ChevronRight size={20} className="rotate-180 text-slate-600" />
               </button>
@@ -773,7 +773,7 @@ const App: React.FC = () => {
       {/* Mode Selection Modal */}
       {isModeSelectionOpen && selectedScenarioForMode && (
          <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-slate-900/50 backdrop-blur-sm">
-           <div className="bg-white rounded-t-3xl md:rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-in slide-in-from-bottom duration-300">
+           <div className="bg-white rounded-t-3xl md:rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-in slide-in-from-bottom duration-300 pb-safe">
              <div className="flex justify-between items-center mb-6">
                <h3 className="text-xl font-bold text-slate-800">Choose Mode</h3>
                <button onClick={() => setIsModeSelectionOpen(false)} className="bg-slate-100 p-1.5 rounded-full text-slate-500 hover:bg-slate-200">
