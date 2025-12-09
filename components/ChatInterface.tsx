@@ -136,10 +136,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           setIsRecording(false);
         },
         () => setIsRecording(false),
-        (err) => {
-          console.error(err);
+        (errorMessage) => {
+          console.error(errorMessage);
           setIsRecording(false);
-          alert("Could not access microphone: " + err);
+          // Simple alert for now, could be a toast in future
+          alert(errorMessage);
         }
       );
     }
