@@ -28,6 +28,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [inputText, setInputText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
 
@@ -80,6 +82,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }, 10000);
     return () => clearInterval(interval);
   }, [onReportProgress]);
+
+  // Clear toast after 2 seconds
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => setToastMessage(null), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
 
   const handleSend = async (text: string) => {
     if (!text.trim()) return;
@@ -146,15 +156,34 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   };
 
-  const handleSaveVocab = (wordStr: string, def: string) => {
+  const handleSaveVocab = (wordStr: string, def: string, contextOverride?: string) => {
     const newWord: VocabularyWord = {
       id: Date.now().toString(),
       word: wordStr,
       definition: def,
-      context: messages[messages.length - 1]?.text || 'Chat context',
+      context: contextOverride || messages[messages.length - 1]?.text || 'Chat context',
       addedAt: Date.now()
     };
     onSaveWord(newWord);
+    setToastMessage(`Saved: ${wordStr}`);
+  };
+
+  const handleWordDoubleClick = (e: React.MouseEvent, contextText: string) => {
+    const selection = window.getSelection();
+    if (!selection) return;
+
+    const selectedText = selection.toString().trim();
+    
+    // Basic validation: Is it a word? (Letters, apostrophes, hyphens, 2+ chars)
+    // Also remove trailing punctuation like periods or commas if selected
+    const cleanWord = selectedText.replace(/[.,!?;:()]/g, '');
+
+    if (cleanWord.length > 1 && /^[a-zA-Z\-'’]+$/.test(cleanWord)) {
+      handleSaveVocab(cleanWord, "Analyzing...", contextText);
+      
+      // Optional: Clear selection so it doesn't stay highlighted
+      selection.removeAllRanges();
+    }
   };
 
   // Get current guided task (from the last AI message)
@@ -164,6 +193,16 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4">
+           <div className="bg-slate-800 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 text-sm font-medium">
+             <CheckCircle2 size={16} className="text-emerald-400" />
+             {toastMessage}
+           </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white px-4 py-3 border-b border-slate-200 flex items-center justify-between shadow-sm z-10">
         <div className="flex items-center gap-3">
@@ -237,24 +276,27 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
               )}
 
               {/* Message Bubble */}
-              <div className={`
-                max-w-[85%] md:max-w-[70%] rounded-2xl px-5 py-4 shadow-sm relative group
-                ${isUser 
-                  ? 'bg-indigo-600 text-white rounded-tr-none' 
-                  : 'bg-white text-slate-800 border border-slate-200 rounded-tl-none'
-                }
-              `}>
-                <p className="text-base leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+              <div 
+                onDoubleClick={(e) => handleWordDoubleClick(e, msg.text)}
+                className={`
+                  max-w-[85%] md:max-w-[70%] rounded-2xl px-5 py-4 shadow-sm relative group cursor-text
+                  ${isUser 
+                    ? 'bg-indigo-600 text-white rounded-tr-none' 
+                    : 'bg-white text-slate-800 border border-slate-200 rounded-tl-none'
+                  }
+                `}
+              >
+                <p className="text-base leading-relaxed whitespace-pre-wrap select-text">{msg.text}</p>
                 
                 {/* AI Features: Translation & Vocab */}
                 {!isUser && (
                   <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
                     {msg.translation && (
-                      <p className="text-slate-500 text-sm italic">{msg.translation}</p>
+                      <p className="text-slate-500 text-sm italic select-none">{msg.translation}</p>
                     )}
                     
                     {msg.suggestedVocab && msg.suggestedVocab.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2">
+                      <div className="flex flex-wrap gap-2 mt-2 select-none">
                         {msg.suggestedVocab.map((v, vIdx) => (
                            <button 
                              key={vIdx}
@@ -274,7 +316,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 <button 
                   onClick={() => speakText(msg.text)}
                   className={`
-                    absolute top-2 right-2 p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity
+                    absolute top-2 right-2 p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity select-none
                     ${isUser ? 'text-indigo-200 hover:bg-indigo-500' : 'text-slate-400 hover:bg-slate-100'}
                   `}
                 >
