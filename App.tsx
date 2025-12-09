@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MessageCircle, Book, User, Plus, X, Sparkles, Trophy, Flame, Loader2, Clock, Calendar, ChevronRight, Edit2, Settings, BarChart3, LogOut, Medal, Target, Languages, Mic } from 'lucide-react';
 import { Scenario, VocabularyWord, ConversationSession, ChatMessage, ChatMode } from './types';
 import { PREDEFINED_SCENARIOS, INITIAL_VOCAB } from './constants';
@@ -325,13 +325,23 @@ const App: React.FC = () => {
     setSessions(prev => prev.map(s => s.id === updatedSession.id ? updatedSession : s));
   };
 
-  const handleReportProgress = (seconds: number) => {
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  // Helper for consistent local date keys (YYYY-MM-DD)
+  const getDateKey = (date: Date = new Date()) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Used useCallback to ensure the function reference is stable.
+  // This prevents the timer in ChatInterface from resetting constantly.
+  const handleReportProgress = useCallback((seconds: number) => {
+    const today = getDateKey();
     setDailyActivity(prev => {
       const current = prev[today] || 0;
       return { ...prev, [today]: current + seconds };
     });
-  };
+  }, []);
 
   const handleSaveWord = async (word: VocabularyWord) => {
     // Check duplication
@@ -439,7 +449,7 @@ const App: React.FC = () => {
     for (let i = 6; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
-      const dateKey = d.toISOString().split('T')[0];
+      const dateKey = getDateKey(d);
       const dayLabel = d.toLocaleDateString('en-US', { weekday: 'narrow' }); // M, T, W
       const seconds = dailyActivity[dateKey] || 0;
       days.push({ 

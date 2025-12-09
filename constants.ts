@@ -153,19 +153,4 @@ export const PREDEFINED_SCENARIOS: Scenario[] = [
   }
 ];
 
-export const INITIAL_VOCAB: VocabularyWord[] = [
-  {
-    id: '1',
-    word: 'Latte',
-    definition: 'A type of coffee made with espresso and hot steamed milk.',
-    context: 'I would like a large latte, please.',
-    addedAt: Date.now(),
-    phonetic: '/ˈlɑː.teɪ/',
-    partOfSpeech: 'n.',
-    chineseDefinition: '拿铁咖啡',
-    exampleSentence: 'She ordered a skinny latte with no sugar.',
-    exampleTranslation: '她点了一杯不加糖的脱脂拿铁。',
-    synonyms: ['coffee', 'espresso', 'brew'],
-    roots: 'From Italian "caffè latte" (milk coffee).'
-  }
-];
+export const INITIAL_VOCAB: VocabularyWord[] = [];
