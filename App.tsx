@@ -7,6 +7,7 @@ import { ChatInterface } from './components/ChatInterface';
 import { VocabBook } from './components/VocabBook';
 import { WordDetail } from './components/WordDetail';
 import { Button } from './components/Button';
+import { AuthScreen } from './components/AuthScreen';
 import { generateScenarioIdeas, lookupVocabulary } from './services/geminiService';
 
 type Tab = 'practice' | 'history' | 'vocab' | 'profile';
@@ -125,29 +126,42 @@ const ScenarioCarousel = ({ scenarios, onSelect }: { scenarios: Scenario[], onSe
 };
 
 const App: React.FC = () => {
+  // --- Auth & User Identification ---
+  const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
+    return localStorage.getItem('fluentai-current-user');
+  });
+
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!currentUserId);
+
+  // Helper to generate user-specific storage keys
+  const getStorageKey = (uid: string, key: string) => `fluentai-${uid}-${key}`;
+
   const [activeTab, setActiveTab] = useState<Tab>('practice');
   const [currentSession, setCurrentSession] = useState<ConversationSession | null>(null);
   const [selectedWord, setSelectedWord] = useState<VocabularyWord | null>(null);
   
-  // Data State
+  // --- Data State (Initialized from User-Specific Storage) ---
   const [vocab, setVocab] = useState<VocabularyWord[]>(() => {
-    const saved = localStorage.getItem('fluentai-vocab');
+    if (!currentUserId) return INITIAL_VOCAB;
+    const saved = localStorage.getItem(getStorageKey(currentUserId, 'vocab'));
     return saved ? JSON.parse(saved) : INITIAL_VOCAB;
   });
   
   const [sessions, setSessions] = useState<ConversationSession[]>(() => {
-    const saved = localStorage.getItem('fluentai-sessions');
+    if (!currentUserId) return [];
+    const saved = localStorage.getItem(getStorageKey(currentUserId, 'sessions'));
     return saved ? JSON.parse(saved) : [];
   });
 
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem('fluentai-profile');
-    return saved ? JSON.parse(saved) : { name: 'English Learner', level: 'Intermediate', avatar: '😎' };
+    if (!currentUserId) return { name: '', level: 'Intermediate', avatar: '😎' };
+    const saved = localStorage.getItem(getStorageKey(currentUserId, 'profile'));
+    return saved ? JSON.parse(saved) : { name: '', level: 'Intermediate', avatar: '😎' };
   });
 
-  // Key: YYYY-MM-DD, Value: Seconds spent
   const [dailyActivity, setDailyActivity] = useState<Record<string, number>>(() => {
-    const saved = localStorage.getItem('fluentai-activity');
+    if (!currentUserId) return {};
+    const saved = localStorage.getItem(getStorageKey(currentUserId, 'activity'));
     return saved ? JSON.parse(saved) : {};
   });
 
@@ -199,11 +213,69 @@ const App: React.FC = () => {
     return () => { if (observerTarget.current) observer.unobserve(observerTarget.current); };
   }, [visibleScenarios, hasMore, isLoadingMore]);
 
-  // Persistence
-  useEffect(() => { localStorage.setItem('fluentai-vocab', JSON.stringify(vocab)); }, [vocab]);
-  useEffect(() => { localStorage.setItem('fluentai-sessions', JSON.stringify(sessions)); }, [sessions]);
-  useEffect(() => { localStorage.setItem('fluentai-profile', JSON.stringify(userProfile)); }, [userProfile]);
-  useEffect(() => { localStorage.setItem('fluentai-activity', JSON.stringify(dailyActivity)); }, [dailyActivity]);
+  // --- Persistence Effects (User Specific) ---
+  useEffect(() => { 
+    if (currentUserId) localStorage.setItem(getStorageKey(currentUserId, 'vocab'), JSON.stringify(vocab)); 
+  }, [vocab, currentUserId]);
+  
+  useEffect(() => { 
+    if (currentUserId) localStorage.setItem(getStorageKey(currentUserId, 'sessions'), JSON.stringify(sessions)); 
+  }, [sessions, currentUserId]);
+  
+  useEffect(() => { 
+    if (currentUserId) localStorage.setItem(getStorageKey(currentUserId, 'profile'), JSON.stringify(userProfile)); 
+  }, [userProfile, currentUserId]);
+  
+  useEffect(() => { 
+    if (currentUserId) localStorage.setItem(getStorageKey(currentUserId, 'activity'), JSON.stringify(dailyActivity)); 
+  }, [dailyActivity, currentUserId]);
+
+  // --- Auth Handlers ---
+  const handleLogin = (name: string) => {
+    // Generate a simple ID from name
+    const userId = name.trim().toLowerCase().replace(/\s+/g, '-');
+    
+    // Attempt to load existing data for this user
+    const savedProfile = localStorage.getItem(getStorageKey(userId, 'profile'));
+    const savedVocab = localStorage.getItem(getStorageKey(userId, 'vocab'));
+    const savedSessions = localStorage.getItem(getStorageKey(userId, 'sessions'));
+    const savedActivity = localStorage.getItem(getStorageKey(userId, 'activity'));
+
+    if (savedProfile) {
+      setUserProfile(JSON.parse(savedProfile));
+    } else {
+      // New User Default
+      setUserProfile({ name: name, level: 'Intermediate', avatar: '😎' });
+    }
+
+    setVocab(savedVocab ? JSON.parse(savedVocab) : INITIAL_VOCAB);
+    setSessions(savedSessions ? JSON.parse(savedSessions) : []);
+    setDailyActivity(savedActivity ? JSON.parse(savedActivity) : {});
+
+    // Commit Auth
+    setCurrentUserId(userId);
+    setIsAuthenticated(true);
+    localStorage.setItem('fluentai-current-user', userId);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('fluentai-current-user');
+    setCurrentUserId(null);
+    setIsAuthenticated(false);
+    
+    // Reset view states
+    setProfileView('main');
+    setActiveTab('practice');
+    setCurrentSession(null);
+    setSelectedWord(null);
+    
+    // Reset data states to prevent flashing old data if logic fails
+    // (though AuthScreen will block view anyway)
+    setVocab(INITIAL_VOCAB);
+    setSessions([]);
+    setUserProfile({ name: '', level: 'Intermediate', avatar: '😎' });
+    setDailyActivity({});
+  };
 
   // Session Management
   const handleScenarioClick = (scenario: Scenario) => {
@@ -339,7 +411,8 @@ const App: React.FC = () => {
       setVocab(INITIAL_VOCAB);
       setSessions([]);
       setDailyActivity({});
-      setUserProfile({ name: 'English Learner', level: 'Intermediate', avatar: '😎' });
+      // Resetting profile but keeping user logged in, or log out?
+      // Let's keep logged in but reset stats.
       setProfileView('main');
     }
   };
@@ -378,6 +451,12 @@ const App: React.FC = () => {
     return days;
   };
 
+  // Render Login Screen if not authenticated
+  if (!isAuthenticated) {
+    return <AuthScreen onLogin={handleLogin} />;
+  }
+
+  // Render Main App
   const chartData = getLast7DaysActivity();
   const maxMinutes = Math.max(...chartData.map(d => d.minutes), 30); 
 
@@ -746,16 +825,26 @@ const App: React.FC = () => {
                  </button>
                </div>
 
+               {/* Log Out Button */}
+               <button 
+                 onClick={handleLogout}
+                 className="w-full bg-slate-100 text-slate-700 font-medium p-4 rounded-2xl border border-slate-200 flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors"
+               >
+                 <LogOut size={18} />
+                 Log Out
+               </button>
+
+               {/* Clear Data Button */}
                <button 
                  onClick={handleClearData}
                  className="w-full bg-red-50 text-red-600 font-medium p-4 rounded-2xl border border-red-100 flex items-center justify-center gap-2 hover:bg-red-100 transition-colors"
                >
-                 <LogOut size={18} />
+                 <X size={18} />
                  Reset All Progress
                </button>
                
                <p className="text-center text-xs text-slate-400 px-4">
-                 Resetting progress will delete your chat history, vocabulary, and profile settings.
+                 Logging out keeps your data on this device. Resetting progress deletes everything.
                </p>
             </div>
           </div>
