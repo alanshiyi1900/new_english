@@ -1,7 +1,15 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ChatMessage, Scenario, ChatMode } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Helper to initialize the client on demand.
+// This prevents issues where process.env.API_KEY might be undefined at module load time.
+const getAiClient = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    console.warn("API Key is missing. Ensure process.env.API_KEY is set.");
+  }
+  return new GoogleGenAI({ apiKey: apiKey || "" });
+};
 
 // Unified schema for both modes
 const chatResponseSchema = {
@@ -47,6 +55,7 @@ const chatResponseSchema = {
 };
 
 export const startGuidedSession = async (scenario: Scenario): Promise<ChatMessage> => {
+  const ai = getAiClient();
   const prompt = `
     You are an English tutor setting up a "Translation Challenge" roleplay.
     Scenario: ${scenario.title}
@@ -89,7 +98,7 @@ export const generateTeacherResponse = async (
   scenario: Scenario,
   mode: ChatMode
 ): Promise<any> => {
-  
+  const ai = getAiClient();
   let systemInstruction = '';
 
   if (mode === 'free') {
@@ -167,6 +176,7 @@ export const generateTeacherResponse = async (
 };
 
 export const generateScenarioIdeas = async (topic: string): Promise<Scenario> => {
+   const ai = getAiClient();
    const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
     contents: `Create a roleplay scenario based on this topic: "${topic}". Return JSON.`,
@@ -195,6 +205,7 @@ export const generateScenarioIdeas = async (topic: string): Promise<Scenario> =>
 }
 
 export const lookupVocabulary = async (word: string, context: string): Promise<any> => {
+  const ai = getAiClient();
   const prompt = `
     Provide a detailed dictionary entry for the word: "${word}".
     Context where it appeared: "${context}".
