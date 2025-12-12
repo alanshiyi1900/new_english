@@ -3,7 +3,7 @@ import { Scenario, ChatMessage, VocabularyWord, ChatMode } from '../types';
 import { generateTeacherResponse, startGuidedSession } from '../services/geminiService';
 import { startListening, speakText } from '../services/speechService';
 import { Button } from './Button';
-import { Mic, Send, Volume2, ArrowLeft, BookmarkPlus, Sparkles, AlertCircle, Loader2, Flag, CheckCircle2 } from 'lucide-react';
+import { Mic, Send, Volume2, ArrowLeft, BookmarkPlus, Sparkles, AlertCircle, Loader2, Flag, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 interface ChatInterfaceProps {
   scenario: Scenario;
@@ -55,8 +55,18 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             setMessages([defaultStart]);
             speakText(scenario.initialMessage);
           }
-        } catch (e) {
+        } catch (e: any) {
           console.error("Failed to init session", e);
+          const errorMsgText = e.message || "Unknown error";
+          const displayError = errorMsgText.includes('API Key') 
+            ? "Setup Error: API Key is missing in Vercel environment variables."
+            : `Connection Error: ${errorMsgText}`;
+            
+          setMessages([{
+            id: 'error-init',
+            role: 'ai',
+            text: displayError
+          }]);
         } finally {
           setIsLoading(false);
         }
@@ -122,12 +132,27 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       setMessages(prev => [...prev, aiMsg]);
       speakText(aiMsg.text);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      const errorMsgText = error.message || "Unknown error";
+      
+      let displayError = "";
+      if (errorMsgText.includes('API Key')) {
+         displayError = "Error: API Key missing. Please check Vercel settings.";
+      } else if (errorMsgText.includes('403')) {
+         displayError = "Error 403: API Key restricted. Check your Google AI Studio API key settings.";
+      } else if (errorMsgText.includes('429')) {
+         displayError = "Error 429: Rate limit exceeded. Please wait a moment.";
+      } else if (errorMsgText.includes('503') || errorMsgText.includes('Failed to fetch')) {
+         displayError = "Connection Error. Please check your internet.";
+      } else {
+         displayError = `Error: ${errorMsgText}`;
+      }
+
       const errorMsg: ChatMessage = {
-        id: 'error',
+        id: 'error-' + Date.now(),
         role: 'ai',
-        text: "I'm having trouble connecting to the server. Please try again."
+        text: displayError
       };
       setMessages(prev => [...prev, errorMsg]);
     } finally {
@@ -229,7 +254,19 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide pb-32">
         {messages.map((msg, idx) => {
           const isUser = msg.role === 'user';
+          const isError = msg.id.startsWith('error');
           
+          if (isError) {
+             return (
+               <div key={msg.id} className="flex justify-center my-4">
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2 text-red-600 text-sm max-w-[90%]">
+                     <AlertTriangle size={16} className="shrink-0" />
+                     <span>{msg.text}</span>
+                  </div>
+               </div>
+             );
+          }
+
           return (
             <div key={msg.id} className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
               
@@ -392,4 +429,4 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
     </div>
   );
-};
+}

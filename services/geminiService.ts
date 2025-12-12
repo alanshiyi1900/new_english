@@ -2,13 +2,22 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { ChatMessage, Scenario, ChatMode } from "../types";
 
 // Helper to initialize the client on demand.
-// This prevents issues where process.env.API_KEY might be undefined at module load time.
 const getAiClient = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    console.warn("API Key is missing. Ensure process.env.API_KEY is set.");
+  // process.env.API_KEY is replaced by Vite at build time
+  // Trim potential quotes or whitespace if the build process injected them weirdly
+  const rawKey = process.env.API_KEY || "";
+  const apiKey = rawKey.replace(/^['"]|['"]$/g, '').trim();
+  
+  // Check for empty or placeholder values
+  if (!apiKey || apiKey === "" || apiKey === "undefined") {
+    console.error("CRITICAL ERROR: API Key is missing.");
+    throw new Error("API Key is missing. Please set API_KEY or VITE_API_KEY in your Vercel Environment Variables.");
   }
-  return new GoogleGenAI({ apiKey: apiKey || "" });
+
+  // Debug log (masked)
+  console.log(`[Gemini] Initializing client with key ending in ...${apiKey.slice(-4)}`);
+  
+  return new GoogleGenAI({ apiKey });
 };
 
 // Unified schema for both modes
@@ -71,25 +80,33 @@ export const startGuidedSession = async (scenario: Scenario): Promise<ChatMessag
     - guidedTask: The first Chinese task (e.g. "请问候店员并询问是否有座").
   `;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: chatResponseSchema,
-      temperature: 0.7
-    }
-  });
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: chatResponseSchema,
+        temperature: 0.7
+      }
+    });
 
-  const data = JSON.parse(response.text || "{}");
-  
-  return {
-    id: 'init-guided',
-    role: 'ai',
-    text: data.roleplayResponse,
-    translation: data.translation,
-    guidedTask: data.guidedTask
-  };
+    const text = response.text;
+    if (!text) throw new Error("Received empty response from AI.");
+
+    const data = JSON.parse(text);
+    
+    return {
+      id: 'init-guided',
+      role: 'ai',
+      text: data.roleplayResponse,
+      translation: data.translation,
+      guidedTask: data.guidedTask
+    };
+  } catch (error) {
+    console.error("Gemini Guided Session Init Error:", error);
+    throw error;
+  }
 };
 
 export const generateTeacherResponse = async (
@@ -165,43 +182,51 @@ export const generateTeacherResponse = async (
     });
 
     const text = response.text;
-    if (!text) throw new Error("No response from AI");
+    if (!text) throw new Error("No text content in AI response.");
     
     return JSON.parse(text);
 
   } catch (error) {
-    console.error("Gemini API Error:", error);
+    console.error("Gemini Response Generation Error:", error);
     throw error;
   }
 };
 
 export const generateScenarioIdeas = async (topic: string): Promise<Scenario> => {
    const ai = getAiClient();
-   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: `Create a roleplay scenario based on this topic: "${topic}". Return JSON.`,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          title: { type: Type.STRING },
-          description: { type: Type.STRING },
-          emoji: { type: Type.STRING },
-          aiRole: { type: Type.STRING },
-          userRole: { type: Type.STRING },
-          initialMessage: { type: Type.STRING },
-          difficulty: { type: Type.STRING, enum: ["Beginner", "Intermediate", "Advanced"] }
+   try {
+     const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: `Create a roleplay scenario based on this topic: "${topic}". Return JSON.`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            description: { type: Type.STRING },
+            emoji: { type: Type.STRING },
+            aiRole: { type: Type.STRING },
+            userRole: { type: Type.STRING },
+            initialMessage: { type: Type.STRING },
+            difficulty: { type: Type.STRING, enum: ["Beginner", "Intermediate", "Advanced"] }
+          }
         }
       }
-    }
-  });
-  
-  const data = JSON.parse(response.text || "{}");
-  return {
-    id: `custom-${Date.now()}`,
-    ...data
-  };
+    });
+    
+    const text = response.text;
+    if (!text) throw new Error("Empty response for scenario generation");
+
+    const data = JSON.parse(text);
+    return {
+      id: `custom-${Date.now()}`,
+      ...data
+    };
+   } catch (error) {
+     console.error("Scenario Generation Error:", error);
+     throw error;
+   }
 }
 
 export const lookupVocabulary = async (word: string, context: string): Promise<any> => {
@@ -240,10 +265,14 @@ export const lookupVocabulary = async (word: string, context: string): Promise<a
         }
       }
     });
+    
+    const text = response.text;
+    if (!text) return {};
 
-    return JSON.parse(response.text || "{}");
+    return JSON.parse(text);
   } catch (error) {
     console.error("Vocab lookup failed", error);
+    // Return empty object instead of throwing to prevent crashing the whole word save flow
     return {};
   }
 };
