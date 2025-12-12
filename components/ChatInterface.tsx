@@ -64,6 +64,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             displayError = "Setup Error: API Key is missing in Vercel environment variables.";
           } else if (errorMsgText.includes('503') || errorMsgText.includes('overloaded')) {
              displayError = "Server Busy (503): The AI is currently overloaded. Please try again in a moment.";
+          } else if (errorMsgText.includes('Load failed') || errorMsgText.includes('Failed to fetch')) {
+             displayError = "Network Error: Could not connect to AI. Please check your internet connection.";
           }
             
           setMessages([{
@@ -149,8 +151,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
          displayError = "Server Busy (503): The AI model is currently overloaded. Please try again in a moment.";
       } else if (errorMsgText.includes('429')) {
          displayError = "Error 429: Rate limit exceeded. Please wait a moment.";
-      } else if (errorMsgText.includes('Failed to fetch')) {
-         displayError = "Connection Error. Please check your internet.";
+      } else if (errorMsgText.includes('Failed to fetch') || errorMsgText.includes('Load failed')) {
+         displayError = "Network Connection Failed. Please check your internet or try disabling VPN/AdBlock.";
       } else {
          displayError = `Error: ${errorMsgText}`;
       }

@@ -20,7 +20,8 @@ const getAiClient = () => {
   return new GoogleGenAI({ apiKey });
 };
 
-// Helper for 503 retries with exponential backoff
+// Helper for retries with exponential backoff
+// Now handles both 503 (Server Overload) and Network Errors (Load failed)
 const retryWithBackoff = async <T>(
   operation: () => Promise<T>,
   retries: number = 3,
@@ -29,16 +30,28 @@ const retryWithBackoff = async <T>(
   try {
     return await operation();
   } catch (error: any) {
-    // Check if error is 503 Service Unavailable / Overloaded
-    // The SDK might wrap the error, so we check message includes
+    const msg = error?.message || '';
+    
+    // Check for 503 Service Unavailable / Overloaded
     const isOverloaded = 
-      error?.message?.includes('503') || 
-      error?.message?.includes('overloaded') || 
+      msg.includes('503') || 
+      msg.includes('overloaded') || 
       error?.status === 503 ||
       error?.code === 503;
 
-    if (retries > 0 && isOverloaded) {
-      console.warn(`[Gemini] Service overloaded (503). Retrying in ${delay}ms... (${retries} attempts left)`);
+    // Check for Network Errors (Common on mobile)
+    // "Load failed" is typical for Safari/iOS network issues
+    // "Failed to fetch" is typical for Chrome
+    const isNetworkError = 
+      msg.includes('Load failed') || 
+      msg.includes('Failed to fetch') || 
+      msg.includes('NetworkError') ||
+      error instanceof TypeError;
+
+    if (retries > 0 && (isOverloaded || isNetworkError)) {
+      const reason = isOverloaded ? 'Server Busy' : 'Network Glitch';
+      console.warn(`[Gemini] ${reason} detected. Retrying in ${delay}ms... (${retries} attempts left)`);
+      
       await new Promise(resolve => setTimeout(resolve, delay));
       return retryWithBackoff(operation, retries - 1, delay * 2);
     }
