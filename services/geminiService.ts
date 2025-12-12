@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { ChatMessage, Scenario, ChatMode } from "../types";
 
 // Helper to initialize the client on demand.
@@ -18,6 +18,33 @@ const getAiClient = () => {
   console.log(`[Gemini] Initializing client with key ending in ...${apiKey.slice(-4)}`);
   
   return new GoogleGenAI({ apiKey });
+};
+
+// Helper for 503 retries with exponential backoff
+const retryWithBackoff = async <T>(
+  operation: () => Promise<T>,
+  retries: number = 3,
+  delay: number = 1000
+): Promise<T> => {
+  try {
+    return await operation();
+  } catch (error: any) {
+    // Check if error is 503 Service Unavailable / Overloaded
+    // The SDK might wrap the error, so we check message includes
+    const isOverloaded = 
+      error?.message?.includes('503') || 
+      error?.message?.includes('overloaded') || 
+      error?.status === 503 ||
+      error?.code === 503;
+
+    if (retries > 0 && isOverloaded) {
+      console.warn(`[Gemini] Service overloaded (503). Retrying in ${delay}ms... (${retries} attempts left)`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return retryWithBackoff(operation, retries - 1, delay * 2);
+    }
+    
+    throw error;
+  }
 };
 
 // Unified schema for both modes
@@ -81,7 +108,7 @@ export const startGuidedSession = async (scenario: Scenario): Promise<ChatMessag
   `;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
@@ -89,7 +116,7 @@ export const startGuidedSession = async (scenario: Scenario): Promise<ChatMessag
         responseSchema: chatResponseSchema,
         temperature: 0.7
       }
-    });
+    }));
 
     const text = response.text;
     if (!text) throw new Error("Received empty response from AI.");
@@ -170,7 +197,7 @@ export const generateTeacherResponse = async (
       Respond as AI (${scenario.aiRole}).
     `;
 
-    const response = await ai.models.generateContent({
+    const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
@@ -179,7 +206,7 @@ export const generateTeacherResponse = async (
         responseSchema: chatResponseSchema,
         temperature: 0.7
       }
-    });
+    }));
 
     const text = response.text;
     if (!text) throw new Error("No text content in AI response.");
@@ -195,7 +222,7 @@ export const generateTeacherResponse = async (
 export const generateScenarioIdeas = async (topic: string): Promise<Scenario> => {
    const ai = getAiClient();
    try {
-     const response = await ai.models.generateContent({
+     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: `Create a roleplay scenario based on this topic: "${topic}". Return JSON.`,
       config: {
@@ -213,7 +240,7 @@ export const generateScenarioIdeas = async (topic: string): Promise<Scenario> =>
           }
         }
       }
-    });
+    }));
     
     const text = response.text;
     if (!text) throw new Error("Empty response for scenario generation");
@@ -246,7 +273,7 @@ export const lookupVocabulary = async (word: string, context: string): Promise<a
   `;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
@@ -264,7 +291,7 @@ export const lookupVocabulary = async (word: string, context: string): Promise<a
           }
         }
       }
-    });
+    }));
     
     const text = response.text;
     if (!text) return {};

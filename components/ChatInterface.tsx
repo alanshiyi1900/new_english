@@ -58,9 +58,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         } catch (e: any) {
           console.error("Failed to init session", e);
           const errorMsgText = e.message || "Unknown error";
-          const displayError = errorMsgText.includes('API Key') 
-            ? "Setup Error: API Key is missing in Vercel environment variables."
-            : `Connection Error: ${errorMsgText}`;
+          let displayError = `Connection Error: ${errorMsgText}`;
+
+          if (errorMsgText.includes('API Key')) {
+            displayError = "Setup Error: API Key is missing in Vercel environment variables.";
+          } else if (errorMsgText.includes('503') || errorMsgText.includes('overloaded')) {
+             displayError = "Server Busy (503): The AI is currently overloaded. Please try again in a moment.";
+          }
             
           setMessages([{
             id: 'error-init',
@@ -141,9 +145,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
          displayError = "Error: API Key missing. Please check Vercel settings.";
       } else if (errorMsgText.includes('403')) {
          displayError = "Error 403: API Key restricted. Check your Google AI Studio API key settings.";
+      } else if (errorMsgText.includes('503') || errorMsgText.includes('overloaded')) {
+         displayError = "Server Busy (503): The AI model is currently overloaded. Please try again in a moment.";
       } else if (errorMsgText.includes('429')) {
          displayError = "Error 429: Rate limit exceeded. Please wait a moment.";
-      } else if (errorMsgText.includes('503') || errorMsgText.includes('Failed to fetch')) {
+      } else if (errorMsgText.includes('Failed to fetch')) {
          displayError = "Connection Error. Please check your internet.";
       } else {
          displayError = `Error: ${errorMsgText}`;
